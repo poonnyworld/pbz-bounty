@@ -1,64 +1,158 @@
-# HonorBot Bounty (Standalone)
+# HonorBot Bounty
 
-Standalone Discord bot for the **Bounty Board** feature. Uses the **same MongoDB** as [honorbot-pbz](../honorbot-pbz) so Honor Points and bounties are shared.
+> Standalone Discord bot for the **Bounty Board** feature. Shares the same MongoDB and Honor Points as the main Honor Bot — one economy, two bots.
+
+[![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
+
+---
+
+## Overview
+
+| Item | Description |
+|------|--------------|
+| **Purpose** | Bounty Board only: create bounties, escrow Honor Points, award points to responders. |
+| **Database** | Same `users` (Honor Points) and `bounties` collections as the main bot — single source of truth. |
+| **Interaction** | Buttons and modals only; no slash commands. |
+
+Run the main Honor Bot for daily check-in, profile, leaderboard, etc.; run **HonorBot Bounty** for Bounty Board only. Ideal for separating concerns or avoiding DB conflicts during local development.
+
+---
+
+## Prerequisites
+
+- **Node.js** 18+
+- **MongoDB** (local, Docker, or Atlas)
+- **Discord** bot token and channel IDs for Bounty Hub, Forum, Showcase, and Admin
+
+---
 
 ## Setup
 
-1. Copy `.env.example` to `.env`.
-2. Set `DISCORD_TOKEN` (this bot’s token; can be a separate Discord app or the same as honorbot-pbz).
-3. **สำคัญ:** ตั้งค่า `MONGO_URI` ตามที่รัน:
-   - **รันบน Local (ทดสอบ):** ใช้ database แยก เช่น `mongodb://127.0.0.1:27017/honorbot_test` — ห้ามชี้ไปที่ DB จริงบน VPS
-   - **รันบน VPS (ใช้งานจริง):** ใช้ DB จริง เช่น `mongodb://127.0.0.1:27017/honorbot`
-4. Set Bounty channel IDs: `BOUNTY_HUB_CHANNEL_ID`, `BOUNTY_FORUM_CHANNEL_ID`, `BOUNTY_SHOWCASE_CHANNEL_ID`, `BOUNTY_ADMIN_CHANNEL_ID`.
-5. Optional: `CLIENT_ID`, `GUILD_ID` for `npm run deploy` / `npm run clear-commands`.
+### 1. Clone and install
 
-**ป้องกันคะแนน Honor Point หาย:** อ่าน [SAFETY.md](SAFETY.md) — อย่าตั้ง `MONGO_URI` บน Local ให้ชี้ไปที่ MongoDB ของ production.
+```bash
+git clone <your-repo-url>
+cd honorbot-bounty
+npm install
+```
+
+### 2. Environment variables
+
+Copy the example env and edit:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DISCORD_TOKEN` | Yes | Your bot token. |
+| `MONGO_URI` | Yes | MongoDB connection string. See [Database safety](#database-safety) below. |
+| `BOUNTY_HUB_CHANNEL_ID` | Yes | Channel for "Create Bounty" / "Check My Bounties" buttons. |
+| `BOUNTY_FORUM_CHANNEL_ID` | Yes | Forum channel for bounty threads. |
+| `BOUNTY_SHOWCASE_CHANNEL_ID` | Yes | Channel for bounty cards. |
+| `BOUNTY_ADMIN_CHANNEL_ID` | Yes | Admin channel for awarding points. |
+| `BOUNTY_MAX_POINTS` | No | Max points per bounty (default: 100). |
+| `CLIENT_ID` / `GUILD_ID` | No | For deploy/clear slash commands (this bot is button-only). |
+
+### 3. Database safety
+
+**Avoid pointing local runs at production data.** Use different database names:
+
+| Environment | `MONGO_URI` example |
+|-------------|----------------------|
+| **Local (development)** | `mongodb://127.0.0.1:27017/honorbot_test` — use a **test** DB name. |
+| **Production (VPS)** | `mongodb://mongodb:27017/honorbot` or your real MongoDB URL. |
+
+- Never use the production `MONGO_URI` in your local `.env` when testing.
+- See [SAFETY.md](SAFETY.md) for a full checklist.
+
+---
 
 ## Run
 
-- **Dev:** `npm run dev`
-- **Prod:** `npm run build` then `npm start`
+### Development
+
+```bash
+npm run dev
+```
+
+### Production (built)
+
+```bash
+npm run build
+npm start
+```
 
 ### Docker
 
-- **Build image:** `docker build -t honorbot-bounty .`
-- **Run container:** `docker run --rm --env-file .env honorbot-bounty`
-- **With docker-compose:** `docker compose up -d` (สร้าง image และรันในพื้นหลัง)
+| Command | Description |
+|---------|-------------|
+| `docker build -t honorbot-bounty .` | Build image. |
+| `docker run --rm --env-file .env honorbot-bounty` | Run container with env file. |
+| `docker compose up -d` | Build and run in background (uses `docker-compose.yml`). |
 
-ถ้า MongoDB รันบน host (นอก container) ใช้ `MONGO_URI=mongodb://host.docker.internal:27017/honorbot` (Mac/Windows). บน Linux อาจต้องใช้ IP ของ host หรือ `network_mode: host` แล้วใช้ `127.0.0.1` ใน MONGO_URI.
+**MongoDB from host (Mac/Windows):**  
+Use `MONGO_URI=mongodb://host.docker.internal:27017/honorbot` (or `/honorbot_test` for local testing).  
+On Linux you may need the host IP or `network_mode: host`.
 
-**เมื่อรัน Docker บนเครื่อง Local:** ใช้ชื่อ DB เป็น `honorbot_test` (เช่น `.../honorbot_test`) เพื่อไม่ให้เขียนทับข้อมูลจริงบน VPS.
+---
 
-## Commands
+## Deployment (Git → VPS)
 
-This bot has **no slash commands**; everything is done via buttons in the Bounty Hub channel. Use `npm run deploy` to clear any old slash commands for this app if you reused an existing bot.
+1. **Local:** Commit and push. `.env` is in `.gitignore` and will not be pushed.
+   ```bash
+   git add .
+   git commit -m "Your message"
+   git push
+   ```
+
+2. **VPS:** Pull, then create `.env` on the server with production values:
+   - `MONGO_URI` → your real MongoDB (e.g. `mongodb://mongodb:27017/honorbot`)
+   - `DISCORD_TOKEN` and all Bounty channel IDs
+
+3. **Run on VPS:**
+   ```bash
+   docker compose up -d
+   ```
+   or:
+   ```bash
+   npm install && npm run build && npm start
+   ```
+
+The bot will then read and write Honor Points and bounties in the production database.
+
+---
 
 ## Shared data
 
-- **users** collection: same Honor Points as honorbot-pbz (read/write).
-- **bounties** collection: same bounties; this bot is the one that manages Bounty Board when running.
-
-Run honorbot-pbz for daily, profile, leaderboard, etc.; run this bot for Bounty Board only to avoid database overlap during local testing.
-
----
-
-## Local (Mac) vs VPS (Production)
-
-- **Local (Mac mini M4):** ทดสอบบนเครื่องตัวเอง — รัน `npm run dev` หรือ `docker compose up -d` แล้วใช้ `.env` ที่ชี้ MongoDB บนเครื่อง (เช่น `127.0.0.1` หรือ `host.docker.internal` ใน Docker).
-- **VPS (ใช้งานจริง):** อัพโปรเจคขึ้น Git จากเครื่อง Local แล้วบน VPS ทำ `git pull` แล้วรันบอทบน VPS (เช่น `docker compose up -d` หรือ `npm run build && npm start`).
-
-**บน VPS หลัง pull แล้ว:**
-
-1. สร้าง `.env` บน VPS (ไม่ commit ไฟล์นี้ — ใช้เฉพาะบนเซิร์ฟเวอร์). ตั้งค่าให้ชี้ **Database จริง**:
-   - `MONGO_URI=mongodb://mongodb:27017/honorbot` (ถ้า MongoDB เป็น service ใน Docker Compose บน VPS)
-   - หรือ `MONGO_URI=mongodb://127.0.0.1:27017/honorbot` (ถ้า MongoDB รันบน VPS ตัวเดียวกัน)
-   - ใส่ `DISCORD_TOKEN` และ Bounty channel IDs ให้ตรงกับ production
-2. รันด้วย Docker: `docker compose up -d` หรือรันด้วย Node: `npm install && npm run build && npm start`.
+| Collection | Usage |
+|------------|--------|
+| `users` | Same Honor Points as the main bot (balance check, deduct on create bounty, add on award). |
+| `bounties` | Bounty threads and status; this bot is the sole manager when running. |
 
 ---
 
-## Push ขึ้น Git แล้ว Deploy บน VPS (ชี้ DB จริง)
+## Commands and interactions
 
-1. **บนเครื่อง Local:** `git add .` → `git commit -m "..."` → `git push` (ไฟล์ `.env` จะไม่ถูก push เพราะอยู่ใน `.gitignore`)
-2. **บน VPS:** `git pull` แล้วสร้างไฟล์ `.env` ขึ้นมาบน VPS เอง ใส่ค่า production รวมถึง `MONGO_URI` ที่ชี้ไปที่ MongoDB จริง (เช่น `mongodb://mongodb:27017/honorbot`)
-3. รันบอทบน VPS (`docker compose up -d` หรือ `npm run build && npm start`) — ตอนนี้จะอ่าน/เขียนข้อมูล Honor Points และ Bounty จาก DB จริง
+This bot has **no slash commands**. All interaction is via:
+
+- **Bounty Hub:** "Create Bounty" and "Check My Bounties" buttons.
+- **Modals:** Topic and amount when creating a bounty.
+- **Thread / Admin:** "Notify Admin", "Done", "Points Awarded" buttons.
+
+If you reuse an existing Discord app that had slash commands, run `npm run deploy` once to clear them (script deploys an empty command list).
+
+---
+
+## Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Run with nodemon (development). |
+| `npm run build` | Compile TypeScript to `dist/`. |
+| `npm start` | Run `dist/index.js`. |
+| `npm run deploy` | Register slash commands (empty for this bot). |
+| `npm run clear-commands` | Clear guild/global commands. |
