@@ -1,5 +1,6 @@
 import { User } from '../models/User';
 import { Bounty, IBounty } from '../models/Bounty';
+import { isHonorPointsApiEnabled, getBalance, deduct, add } from './HonorPointsApiClient';
 
 const BOUNTY_MAX_POINTS_DEFAULT = 100;
 const BOUNTY_MIN_POINTS = 1;
@@ -48,19 +49,32 @@ export class BountyService {
       return { success: false, error: `Bounty cannot exceed ${maxBounty} points per request.` };
     }
 
-    const user = await User.findOne({ userId: requesterUserId });
-    if (!user) {
-      return { success: false, error: 'User not found. Please use the bot in a server first.' };
+    if (isHonorPointsApiEnabled()) {
+      const balance = await getBalance(requesterUserId);
+      if (balance < amount) {
+        return {
+          success: false,
+          error: `Insufficient honor points. You have ${balance}, need ${amount}.`,
+        };
+      }
+      const result = await deduct(requesterUserId, amount);
+      if (!result.success) {
+        return { success: false, error: result.error ?? 'Failed to deduct points.' };
+      }
+    } else {
+      const user = await User.findOne({ userId: requesterUserId });
+      if (!user) {
+        return { success: false, error: 'User not found. Please use the bot in a server first.' };
+      }
+      if (user.honorPoints < amount) {
+        return {
+          success: false,
+          error: `Insufficient honor points. You have ${user.honorPoints}, need ${amount}.`,
+        };
+      }
+      user.honorPoints -= amount;
+      await user.save();
     }
-    if (user.honorPoints < amount) {
-      return {
-        success: false,
-        error: `Insufficient honor points. You have ${user.honorPoints}, need ${amount}.`,
-      };
-    }
-
-    user.honorPoints -= amount;
-    await user.save();
 
     const bounty = await Bounty.create({
       threadId,
@@ -175,25 +189,32 @@ export class BountyService {
       return { success: false, error: cooldown.reason };
     }
 
-    let recipient = await User.findOne({ userId: recipientUserId });
-    if (!recipient) {
-      recipient = await User.create({
-        userId: recipientUserId,
-        username: 'Unknown', // Will be updated on next interaction
-        honorPoints: 0,
-        lastMessageDate: new Date(),
-        dailyPoints: 0,
-        lastMessagePointsReset: new Date(),
-        dailyMessageCount: 0,
-        lastDailyReset: new Date(0),
-        dailyCheckinStreak: 0,
-        lastCheckinDate: new Date(0),
-        dailyLuckyDrawCount: 0,
-        lastLuckyDrawDate: new Date(0),
-      });
+    if (isHonorPointsApiEnabled()) {
+      const result = await add(recipientUserId, bounty.bountyAmount, 'Unknown');
+      if (!result.success) {
+        return { success: false, error: result.error ?? 'Failed to award points.' };
+      }
+    } else {
+      let recipient = await User.findOne({ userId: recipientUserId });
+      if (!recipient) {
+        recipient = await User.create({
+          userId: recipientUserId,
+          username: 'Unknown',
+          honorPoints: 0,
+          lastMessageDate: new Date(),
+          dailyPoints: 0,
+          lastMessagePointsReset: new Date(),
+          dailyMessageCount: 0,
+          lastDailyReset: new Date(0),
+          dailyCheckinStreak: 0,
+          lastCheckinDate: new Date(0),
+          dailyLuckyDrawCount: 0,
+          lastLuckyDrawDate: new Date(0),
+        });
+      }
+      recipient.honorPoints += bounty.bountyAmount;
+      await recipient.save();
     }
-    recipient.honorPoints += bounty.bountyAmount;
-    await recipient.save();
 
     bounty.status = 'awarded';
     bounty.awardedToUserId = recipientUserId;

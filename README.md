@@ -111,6 +111,7 @@ On Linux you may need the host IP or `network_mode: host`.
 
 2. **VPS:** Pull, then create `.env` on the server with production values:
    - `MONGO_URI` → your real MongoDB (e.g. `mongodb://mongodb:27017/honorbot`)
+   - Optional: `HONOR_POINTS_API_URL`, `HONOR_POINTS_API_KEY` to use the central Honor Points API; `BOTS_LOGGER_URL`, `BOTS_LOGGER_API_KEY` for action logging.
    - `DISCORD_TOKEN` and all Bounty channel IDs
 
 3. **Run on VPS:**
