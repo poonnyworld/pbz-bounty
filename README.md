@@ -16,7 +16,7 @@
 | **Database** | Same `users` (Honor Points) and `bounties` collections as the main bot — single source of truth. |
 | **Interaction** | Buttons and modals only; no slash commands. |
 
-Run the main Honor Bot for daily check-in, profile, leaderboard, etc.; run **HonorBot Bounty** for Bounty Board only. Ideal for separating concerns or avoiding DB conflicts during local development.
+Run the main Honor Bot for daily check-in, profile, leaderboard, etc.; run **HonorBot Bounty** for Bounty Board only. Ideal for separating concerns or avoiding DB conflicts during local development. In multi-stack deployment, run **honor-points-service (Stack 1)** first so MongoDB and the Honor Points API are available.
 
 ---
 
